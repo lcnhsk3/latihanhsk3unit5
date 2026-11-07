@@ -98,9 +98,9 @@ function render(){
  }else{
   let list=q.type==='tf'?q.options:(q.options||[]);
   if(q.type==='picture'){
-   opts.className='picture-options';list.forEach(op=>{let key=op.label;let b=document.createElement('button');b.className='picture-opt';b.innerHTML='<span class="letter">'+op.label+'</span><img alt="练习册图片 '+op.label+'" src="'+op.image+'">';b.onclick=()=>choose(key);if(answered){if(q.answer===key)b.classList.add('correct');if(answered.key===key&&q.answer!==key)b.classList.add('wrong')}opts.appendChild(b)});
+   opts.className='picture-options';list.forEach(op=>{let key=op.label;let b=document.createElement('button');b.className='picture-opt';b.innerHTML='<span class="letter">'+op.label+'</span><img alt="练习册图片 '+op.label+'" src="'+op.image+'">';b.onclick=()=>choose(key);opts.appendChild(b)});
   }else{
-   opts.className='options';list.forEach((op,i)=>{let text=typeof op==='string'?op:op.text;let key=q.type==='tf'?(String(text).startsWith('√')?'true':'false'):String.fromCharCode(65+i);let b=document.createElement('button');b.className='opt';b.textContent=text;b.onclick=()=>choose(key);if(answered){let correct=q.type==='tf'?String(q.answer)===key:q.answer===key;if(correct)b.classList.add('correct');if(answered.key===key&&!correct)b.classList.add('wrong')}opts.appendChild(b)});
+   opts.className='options';list.forEach((op,i)=>{let text=typeof op==='string'?op:op.text;let key=q.type==='tf'?(String(text).startsWith('√')?'true':'false'):String.fromCharCode(65+i);let b=document.createElement('button');b.className='opt';b.textContent=text;b.onclick=()=>choose(key);opts.appendChild(b)});
   }
  }
  const next=document.getElementById('next');
@@ -112,7 +112,7 @@ function render(){
  updateScores();
 }
 
-function choose(key){let q=current(),correct=q.type==='tf'?String(q.answer)===key:q.type==='picture'?q.answer===key:q.answer===key;answers[section][idx]={key,correct,done:true};stopListening();if(idx<sections[section].arr.length-1){idx++;render()}else if(section!=='writing'){finishSection(false)}else{render()}}
+function choose(key){answers[section][idx]={key,done:true};stopListening();if(idx<sections[section].arr.length-1){idx++;render()}else if(section!=='writing'){finishSection(false)}else{render()}}
 
 function drawWords(q,picked){
  let p=document.getElementById('picked'),bank=document.getElementById('wordbank');p.innerHTML='';bank.innerHTML='';
@@ -134,14 +134,26 @@ function drawWords(q,picked){
 function placeWord(word,slotIndex,q,picked){let existing=picked.indexOf(word);if(existing>=0)picked.splice(existing,1);picked[slotIndex]=word;picked=picked.filter(Boolean);answers[section][idx]={picked};drawWords(q,picked)}
 function resetWords(){answers[section][idx]={picked:[]};render()}
 function checkWriting(){
- let q=current(),correct=false;
+ let q=current();
  if(q.type==='hanzi'||q.type==='pinyin'){
   let val=(document.getElementById('answerInput')?.value||'').trim().toLowerCase().replace(/\s+/g,'');
-  correct=val===q.answer.toLowerCase();answers[section][idx]={value:val,correct,done:true};
+  answers[section][idx]={value:val,done:true};
  }else{
-  let picked=answers[section][idx]?.picked||[];correct=picked.join('')===q.answer.replace(/[。！？]$/,'');answers[section][idx]={picked,correct,done:true};
+  let picked=answers[section][idx]?.picked||[];answers[section][idx]={picked,done:true};
  }
  if(idx<sections[section].arr.length-1){idx++;render()}else{render()}
+}
+function gradeAllAnswers(){
+ for(const sec of ['listen','reading','writing']){
+  sections[sec].arr.forEach((q,i)=>{
+   const a=answers[sec][i];if(!a)return;
+   let correct=false;
+   if(q.type==='hanzi'||q.type==='pinyin')correct=(a.value||'').trim().toLowerCase().replace(/\s+/g,'')===String(q.answer).toLowerCase().replace(/\s+/g,'');
+   else if(q.type==='reorder')correct=(a.picked||[]).join('')===String(q.answer).replace(/[。！？]$/,'');
+   else correct=String(a.key)===String(q.answer);
+   a.correct=correct;
+  });
+ }
 }
 
 function allAnswersPresent(){return ['listen','reading','writing'].every(sec=>sections[sec].arr.every((q,i)=>!!answers[sec][i]&&(answers[sec][i].done||answers[sec][i].key!==undefined)))}
@@ -150,6 +162,7 @@ function prevQ(){stopListening();if(idx>0){idx--;render()}}
 function submitAll(){
  if(!allAnswersPresent()){alert('Masih ada soal yang belum dijawab. Silakan lengkapi semua bagian 听力、阅读 dan 书写 sebelum Submit.');return}
  stopListening();clearInterval(interval);interval=null;
+ gradeAllAnswers();
  completed={listen:true,reading:true,writing:true};['listen','reading','writing'].forEach(x=>document.getElementById('tab-'+x).disabled=true);
  updateScores();let pct=Number(document.getElementById('percent').textContent.replace('%',''));
  if(pct>=90){document.getElementById('tab-review').disabled=false;document.getElementById('target-status').innerHTML='🎉 Selamat! Target pembelajaran tercapai: <b>'+pct+'%</b>. Kunci jawaban dan pembahasan telah terbuka.';alert('Submit berhasil! Nilai Anda '+pct+'%. Target minimal 90% tercapai. Pembahasan telah terbuka.');section='review';idx=0;activateTab('review');renderReview();}
